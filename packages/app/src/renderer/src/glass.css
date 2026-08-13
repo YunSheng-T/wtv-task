@@ -1,0 +1,402 @@
+/* ============================================================
+   wtv-task — Apple Liquid Glass (web approximation for Electron)
+   Native NSVisualEffectView provides the base material; these
+   layers add edge refraction, a pointer-tracked specular
+   highlight, tint and spring motion — the signature of the
+   Tahoe / iOS-26 liquid material.
+   ============================================================ */
+
+:root {
+  /* Ink */
+  --ink-1: rgba(255, 255, 255, 0.97);
+  --ink-2: rgba(235, 235, 245, 0.74);
+  --ink-3: rgba(220, 220, 235, 0.52);
+  --ink-4: rgba(210, 210, 230, 0.34);
+
+  /* Material — clear liquid lenses over native vibrancy.
+     Kept deliberately untinted: liquid glass stays transparent
+     and lets whatever sits behind carry the color. */
+  --lens: rgba(255, 255, 255, 0.07);
+  --lens-strong: rgba(255, 255, 255, 0.115);
+  --lens-hover: rgba(255, 255, 255, 0.14);
+  --lens-pressed: rgba(255, 255, 255, 0.075);
+  --hairline: rgba(255, 255, 255, 0.09);
+  --hairline-strong: rgba(255, 255, 255, 0.20);
+  --specular: rgba(255, 255, 255, 0.65);
+
+  /* Accent — macOS system blue, used sparingly */
+  --accent: #4ea2ff;
+  --accent-deep: #0a84ff;
+  --accent-tint: rgba(10, 132, 255, 0.16);
+  --accent-tint-strong: rgba(10, 132, 255, 0.26);
+  --accent-glow: rgba(10, 132, 255, 0.38);
+
+  /* Semantic */
+  --amber: #ffc857;
+  --cyan: #67e8f9;
+  --green: #86efac;
+  --red: #ff8a8a;
+  --gray: #9aa3b2;
+
+  /* Continuous-corner approximation */
+  --r-pill: 999px;
+  --r-lg: 24px;
+  --r-md: 18px;
+  --r-sm: 12px;
+
+  /* Liquid motion — fast attack, long elastic settle */
+  --ease: cubic-bezier(0.22, 0.9, 0.24, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-liquid: cubic-bezier(0.32, 1.42, 0.42, 1);
+
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+}
+
+* { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  color: var(--ink-1);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  overflow: hidden;
+}
+
+/* Dark liquid base — guarantees contrast regardless of the wallpaper
+   behind the vibrancy layer; color washes give lenses something to refract */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(1000px 600px at 50% -20%, rgba(255,255,255,.05), transparent 60%),
+    linear-gradient(168deg, rgba(18,18,22,.86), rgba(12,12,16,.78) 55%, rgba(15,15,20,.82));
+  pointer-events: none;
+}
+
+/* ---------- The liquid lens primitive ---------- */
+.lens {
+  --mx: 50%;
+  --my: -160%;
+  position: relative;
+  background: var(--lens);
+  backdrop-filter: blur(34px) saturate(190%) brightness(1.14);
+  -webkit-backdrop-filter: blur(34px) saturate(190%) brightness(1.14);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  /* Curved-edge lensing: light pools on the top lip, faint
+     refraction on the flanks, deep soft contact shadow below */
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.38),
+    inset 0 -1px 1px rgba(255,255,255,.05),
+    inset 1px 0 1px rgba(255,255,255,.06),
+    inset -1px 0 1px rgba(255,255,255,.06),
+    0 6px 24px rgba(0,0,0,.16),
+    0 1px 3px rgba(0,0,0,.12);
+  isolation: isolate;
+}
+/* Specular layer — a soft highlight that tracks the pointer
+   (specular.ts feeds --mx/--my); falls back to a static top sheen */
+.lens::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(240px 190px at var(--mx) var(--my), rgba(255,255,255,.16), rgba(255,255,255,.045) 42%, transparent 68%),
+    linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.03) 32%, transparent 55%);
+  pointer-events: none; z-index: 0;
+  mix-blend-mode: screen;
+  transition: opacity .25s var(--ease);
+}
+/* Edge refraction — a gradient rim that bends light around the
+   perimeter: bright top-left, dimmed waist, faint re-glow at the
+   bottom, like light passing through a curved meniscus */
+.lens::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    155deg,
+    rgba(255,255,255,.55),
+    rgba(255,255,255,.10) 28%,
+    rgba(255,255,255,.02) 52%,
+    rgba(255,255,255,.05) 74%,
+    rgba(255,255,255,.18)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none; z-index: 0;
+}
+.lens > * { position: relative; z-index: 1; }
+
+.lens-strong {
+  background: var(--lens-strong);
+  backdrop-filter: blur(48px) saturate(210%) brightness(1.2);
+  -webkit-backdrop-filter: blur(48px) saturate(210%) brightness(1.2);
+}
+
+/* Interactive lens — buttons, list rows, chips.
+   Liquid behavior: lifts toward the pointer, specular blooms,
+   presses squish like a gel pad and spring back. */
+.lens-interactive {
+  transition:
+    transform .28s var(--ease-liquid),
+    background .24s var(--ease),
+    border-color .24s var(--ease),
+    box-shadow .28s var(--ease);
+  will-change: transform;
+}
+.lens-interactive:hover {
+  background: var(--lens-hover);
+  border-color: var(--hairline-strong);
+  transform: translateY(-1px) scale(1.008);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.52),
+    inset 0 -1px 1px rgba(255,255,255,.06),
+    inset 1px 0 1px rgba(255,255,255,.09),
+    inset -1px 0 1px rgba(255,255,255,.09),
+    0 14px 38px rgba(0,0,0,.28),
+    0 2px 7px rgba(0,0,0,.16);
+}
+.lens-interactive:active {
+  transform: translateY(0) scale(.965);
+  background: var(--lens-pressed);
+  transition-duration: .07s;
+}
+
+/* Tinted selected state — clear glass with an accent meniscus,
+   not an opaque fill */
+.lens-selected {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-glow) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.48),
+    inset 0 0 0 1px rgba(78,162,255,.25),
+    inset 0 -8px 18px rgba(10,132,255,.12),
+    0 12px 32px rgba(10,132,255,.22) !important;
+}
+
+/* Panes (the structural chrome) — mostly native vibrancy, hairline separators */
+.pane-divider-r { border-right: 1px solid var(--hairline); }
+.pane-divider-l { border-left: 1px solid var(--hairline); }
+.pane-divider-t { border-top: 1px solid var(--hairline); }
+.pane-divider-b { border-bottom: 1px solid var(--hairline); }
+
+/* ---------- Inputs ---------- */
+.glass-input,
+.glass-input input,
+.glass-input textarea,
+.glass-input .mantine-Input-input {
+  background: rgba(255,255,255,.055) !important;
+  color: var(--ink-1) !important;
+}
+.glass-input {
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  box-shadow: none;
+  transition: background .18s var(--ease), box-shadow .22s var(--ease);
+}
+.glass-input:hover {
+  background: rgba(255,255,255,.075) !important;
+}
+.glass-input:focus, .glass-input:focus-within {
+  background: rgba(255,255,255,.09) !important;
+  box-shadow: 0 0 0 3px rgba(10,132,255,.32) !important;
+}
+.glass-input::placeholder { color: var(--ink-3); }
+
+/* ---------- Buttons ---------- */
+/* Flat modern buttons — depth lives on the glass surfaces,
+   not on the button. Rounded rect, no border, no gloss band. */
+.glass-btn {
+  --mx: 50%;
+  --my: -160%;
+  position: relative;
+  background: rgba(255,255,255,.08);
+  border: none;
+  border-radius: 10px;
+  color: var(--ink-1);
+  font-weight: 500;
+  letter-spacing: 0;
+  box-shadow: none;
+  transition: transform .22s var(--ease-liquid), background .16s var(--ease), filter .16s var(--ease);
+  overflow: hidden;
+}
+.glass-btn::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(120px 80px at var(--mx) var(--my), rgba(255,255,255,.16), transparent 65%);
+  pointer-events: none;
+}
+.glass-btn:hover { background: rgba(255,255,255,.13); }
+.glass-btn:active { transform: scale(.96); transition-duration: .07s; }
+
+.accent-btn {
+  --mx: 50%;
+  --my: -160%;
+  position: relative;
+  background: var(--accent-deep);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: none;
+  transition: transform .22s var(--ease-liquid), filter .16s var(--ease);
+  overflow: hidden;
+}
+.accent-btn::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(130px 90px at var(--mx) var(--my), rgba(255,255,255,.22), transparent 62%);
+  pointer-events: none;
+}
+.accent-btn:hover { filter: brightness(1.12); }
+.accent-btn:active { transform: scale(.96); transition-duration: .07s; }
+.glass-btn:disabled, .accent-btn:disabled { opacity: .45; }
+
+/* ---------- Type helpers ---------- */
+.eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-3);
+}
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.display { font-weight: 700; letter-spacing: -0.02em; }
+
+/* ---------- Status dots & badges ---------- */
+.dot { display:inline-block; width:7px; height:7px; border-radius:50%; box-shadow:0 0 7px currentColor; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.45;transform:scale(.8)} }
+.pulse { animation: pulse 1.9s ease-in-out infinite; }
+
+.status-backlog,.status-pending{color:#c3c9d6}
+.status-active,.status-in_progress{color:var(--accent)}
+.status-done,.status-resolved{color:var(--green)}
+.status-blocked{color:var(--red)}
+.status-captured{color:#cbd5e1}
+.status-confirmed{color:var(--amber)}
+.status-injected{color:var(--cyan)}
+.status-dismissed,.status-cancelled,.status-archived{color:var(--gray)}
+
+.badge-glass {
+  background: rgba(255,255,255,.07);
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+/* ---------- Motion ---------- */
+@keyframes rise { from { opacity:0; transform: translateY(10px) scale(.975); } to { opacity:1; transform:none; } }
+@keyframes pop {
+  0% { opacity:0; transform:scale(.9) translateY(6px); }
+  55% { opacity:1; transform:scale(1.025) translateY(-1px); }
+  100% { opacity:1; transform:scale(1); }
+}
+.rise { animation: rise .38s var(--ease-liquid) both; }
+.pop { animation: pop .38s var(--ease-spring) both; }
+
+/* ---------- Scrollbars ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); background-clip: content-box; }
+
+.titlebar-drag { -webkit-app-region: drag; }
+.titlebar-no-drag { -webkit-app-region: no-drag; }
+
+/* Mantine surface transparency */
+.mantine-Paper-root { background: transparent; }
+.mantine-Modal-content, .mantine-Modal-header {
+  background: rgba(22,20,30,.55) !important;
+  backdrop-filter: blur(48px) saturate(200%) brightness(1.12);
+  border: 1px solid var(--hairline-strong) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow:
+    0 32px 90px rgba(0,0,0,.52),
+    inset 0 1px 1px rgba(255,255,255,.38),
+    inset 0 -1px 1px rgba(255,255,255,.05) !important;
+}
+.mantine-Modal-overlay { background: rgba(0,0,0,.2) !important; backdrop-filter: blur(6px); }
+.mantine-Modal-title { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+.mantine-Modal-header { padding: 18px 20px 6px; }
+.mantine-Modal-body { padding: 6px 20px 20px; }
+.mantine-Modal-close { color: var(--ink-3); }
+.mantine-Modal-close:hover { background: rgba(255,255,255,.08); color: var(--ink-1); }
+.mantine-Input-label { font-size: 12px; font-weight: 500; color: var(--ink-3); margin-bottom: 5px; }
+
+/* Tooltip / notifications / dropdown options */
+.mantine-Tooltip-tooltip {
+  background: rgba(30,28,40,.92);
+  backdrop-filter: blur(20px) saturate(170%);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.mantine-Notification-root {
+  background: rgba(26,24,34,.78) !important;
+  backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--hairline) !important;
+  border-radius: var(--r-md) !important;
+  box-shadow: 0 16px 44px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18) !important;
+}
+.mantine-Select-option, .mantine-Menu-item {
+  border-radius: 8px;
+  font-size: 13px;
+}
+.mantine-Select-option[data-combobox-selected] {
+  background: var(--accent-tint);
+  color: var(--ink-1);
+}
+.mantine-Select-dropdown, .mantine-Menu-dropdown {
+  background: rgba(26,24,34,.72) !important;
+  backdrop-filter: blur(36px) saturate(190%);
+  border: 1px solid var(--hairline-strong) !important;
+  border-radius: var(--r-md) !important;
+  box-shadow: 0 18px 50px rgba(0,0,0,.42), inset 0 1px 1px rgba(255,255,255,.28) !important;
+}
+.mantine-Select-option:hover, .mantine-Menu-item:hover {
+  background: rgba(255,255,255,.09);
+}
+
+/* Plain list row — text-first; glass appears only on hover/selection */
+.row {
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  transition: background .18s var(--ease), border-color .18s var(--ease);
+  cursor: pointer;
+}
+.row:hover { background: rgba(255,255,255,.055); }
+.row-selected {
+  background: var(--accent-tint);
+  border-color: rgba(78,162,255,.28);
+}
+
+/* ---------- Accessibility fallbacks ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lens, .lens-strong, .glass-input, .glass-btn, .badge-glass {
+    background: rgba(28,26,36,.92) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .mantine-Modal-content { background: rgba(24,22,32,.96) !important; }
+}

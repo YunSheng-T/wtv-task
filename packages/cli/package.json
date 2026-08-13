@@ -1,0 +1,18 @@
+{
+  "name": "@wtv-task/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "wtv-task": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "postbuild": "chmod +x dist/index.js"
+  },
+  "dependencies": {
+    "@wtv-task/sdk": "workspace:*"
+  }
+}
