@@ -181,10 +181,11 @@ function RequirementColumn({ requirements, selectedId, onSelect }: {
         </Stack>
       </ScrollArea>
       <Modal opened={opened} onClose={handlers.close} title="New requirement" centered size="sm" radius="lg">
-        <TextInput label="Title" value={title} onChange={(e) => setTitle(e.currentTarget.value)} className="glass-input"
+        <TextInput placeholder="Requirement title" size="md" value={title} onChange={(e) => setTitle(e.currentTarget.value)} className="glass-input"
           onKeyDown={(e) => e.key === 'Enter' && title.trim() && create.mutate()} data-autofocus />
-        <Group justify="flex-end" mt="md">
-          <Button className="accent-btn" size="xs" radius={10} onClick={() => create.mutate()} disabled={!title.trim()}>Create</Button>
+        <Group justify="flex-end" gap={8} mt="lg">
+          <Button className="glass-btn" size="sm" variant="subtle" onClick={handlers.close}>Cancel</Button>
+          <Button className="accent-btn" size="sm" onClick={() => create.mutate()} disabled={!title.trim()}>Create</Button>
         </Group>
       </Modal>
     </Box>
@@ -240,10 +241,11 @@ function TaskColumn({ requirement, tasks, selectedTaskId, onSelect }: {
         </Stack>
       </ScrollArea>
       <Modal opened={opened} onClose={handlers.close} title="New task" centered size="sm" radius="lg">
-        <TextInput label="Title" value={title} onChange={(e) => setTitle(e.currentTarget.value)} className="glass-input" mb="sm" data-autofocus />
-        <Textarea label="Goal" autosize minRows={2} value={goal} onChange={(e) => setGoal(e.currentTarget.value)} className="glass-input" />
-        <Group justify="flex-end" mt="md">
-          <Button className="accent-btn" size="xs" radius={10} onClick={() => create.mutate()} disabled={!title.trim()}>Create</Button>
+        <TextInput placeholder="Task title" size="md" value={title} onChange={(e) => setTitle(e.currentTarget.value)} className="glass-input" mb="sm" data-autofocus />
+        <Textarea placeholder="Goal (optional)" autosize minRows={2} size="md" value={goal} onChange={(e) => setGoal(e.currentTarget.value)} className="glass-input" />
+        <Group justify="flex-end" gap={8} mt="lg">
+          <Button className="glass-btn" size="sm" variant="subtle" onClick={handlers.close}>Cancel</Button>
+          <Button className="accent-btn" size="sm" onClick={() => create.mutate()} disabled={!title.trim()}>Create</Button>
         </Group>
       </Modal>
     </Box>

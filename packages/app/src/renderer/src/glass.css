@@ -317,14 +317,14 @@ body::before {
 /* Mantine surface transparency */
 .mantine-Paper-root { background: transparent; }
 .mantine-Modal-content, .mantine-Modal-header {
-  background: rgba(22,20,30,.55) !important;
+  background: rgba(24,23,32,.72) !important;
   backdrop-filter: blur(48px) saturate(200%) brightness(1.12);
-  border: 1px solid var(--hairline-strong) !important;
+  border: 1px solid var(--hairline) !important;
   border-radius: var(--r-lg) !important;
   box-shadow:
     0 32px 90px rgba(0,0,0,.52),
-    inset 0 1px 1px rgba(255,255,255,.38),
-    inset 0 -1px 1px rgba(255,255,255,.05) !important;
+    inset 0 1px 1px rgba(255,255,255,.25),
+    inset 0 -1px 1px rgba(255,255,255,.04) !important;
 }
 .mantine-Modal-overlay { background: rgba(0,0,0,.2) !important; backdrop-filter: blur(6px); }
 .mantine-Modal-title { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
