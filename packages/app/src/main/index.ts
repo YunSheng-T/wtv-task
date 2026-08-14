@@ -252,6 +252,12 @@ app.whenReady().then(async () => {
     // vibrancy layer renders dark regardless of the system theme.
     nativeTheme.themeSource = 'dark';
 
+    // Use the app icon on the Dock in dev (packaged builds use the bundle icon)
+    if (IS_MAC) {
+      const iconPath = join(__dirname, '../../resources/icon.png');
+      app.dock?.setIcon(nativeImage.createFromPath(iconPath));
+    }
+
     const dbPath = join(app.getPath('userData'), 'wtv-task.db');
     core = CoreApp.fromFile(dbPath);
 

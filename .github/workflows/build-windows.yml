@@ -32,10 +32,11 @@ jobs:
         env:
           npm_config_ignore_scripts: "true"
 
-      - name: Copy build output and builder config
+      - name: Copy build output, icons and builder config
         shell: pwsh
         run: |
           Copy-Item -Recurse -Force packages/app/dist out/app/dist
+          Copy-Item -Recurse -Force packages/app/resources out/app/resources
           Copy-Item -Force packages/app/electron-builder.yml out/app/electron-builder.yml
 
       - name: Build NSIS installer

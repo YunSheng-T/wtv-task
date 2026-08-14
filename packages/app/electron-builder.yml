@@ -10,7 +10,10 @@ files:
   - dist/**
   - package.json
 npmRebuild: true
+mac:
+  icon: resources/icon.icns
 win:
+  icon: resources/icon.ico
   target:
     - nsis
 nsis:
