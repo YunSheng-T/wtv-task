@@ -39,7 +39,7 @@ jobs:
           Copy-Item -Force packages/app/electron-builder.yml out/app/electron-builder.yml
 
       - name: Build NSIS installer
-        run: pnpm --filter @wtv-task/app exec electron-builder --win --projectDir out/app --config out/app/electron-builder.yml
+        run: node packages/app/node_modules/electron-builder/out/cli/cli.js --win --projectDir out/app --config electron-builder.yml
 
       - uses: actions/upload-artifact@v4
         with:
