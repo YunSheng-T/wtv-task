@@ -1,0 +1,19 @@
+appId: com.wtv-task.app
+productName: wtv-task
+asar: true
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+directories:
+  output: release
+files:
+  - dist/**
+  - package.json
+npmRebuild: true
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: wtv-task

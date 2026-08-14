@@ -1,0 +1,49 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -r build
+
+      # pnpm workspaces use symlinks, which electron-builder cannot package.
+      # pnpm deploy materializes the app with real node_modules (workspace
+      # packages included). Scripts are skipped; electron-builder rebuilds
+      # better-sqlite3 for the Electron ABI itself (npmRebuild: true).
+      - name: Deploy app to isolated folder
+        run: pnpm --filter @wtv-task/app deploy --legacy --prod out/app
+        env:
+          npm_config_ignore_scripts: "true"
+
+      - name: Copy build output and builder config
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse -Force packages/app/dist out/app/dist
+          Copy-Item -Force packages/app/electron-builder.yml out/app/electron-builder.yml
+
+      - name: Build NSIS installer
+        run: pnpm --filter @wtv-task/app exec electron-builder --win --projectDir out/app --config out/app/electron-builder.yml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wtv-task-windows
+          path: out/app/release/*.exe
+          retention-days: 14
