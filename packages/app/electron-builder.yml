@@ -1,5 +1,6 @@
 appId: com.wtv-task.app
 productName: wtv-task
+electronVersion: 33.4.11
 asar: true
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
