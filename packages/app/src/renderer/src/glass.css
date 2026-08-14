@@ -200,6 +200,15 @@ body::before {
   box-shadow: none;
   transition: background .18s var(--ease), box-shadow .22s var(--ease);
 }
+/* Mantine draws its own border on the inner input — kill it, the
+   wrapper owns the fill and the focus ring (single-layer field) */
+.glass-input .mantine-Input-input,
+.glass-input .mantine-Input-input:focus,
+.glass-input .mantine-Input-input:focus-within {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
 .glass-input:hover {
   background: rgba(255,255,255,.075) !important;
 }
@@ -316,7 +325,7 @@ body::before {
 
 /* Mantine surface transparency */
 .mantine-Paper-root { background: transparent; }
-.mantine-Modal-content, .mantine-Modal-header {
+.mantine-Modal-content {
   background: rgba(24,23,32,.72) !important;
   backdrop-filter: blur(48px) saturate(200%) brightness(1.12);
   border: 1px solid var(--hairline) !important;
@@ -325,6 +334,13 @@ body::before {
     0 32px 90px rgba(0,0,0,.52),
     inset 0 1px 1px rgba(255,255,255,.25),
     inset 0 -1px 1px rgba(255,255,255,.04) !important;
+}
+/* The header must not be a second slab on top of the content */
+.mantine-Modal-header {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 .mantine-Modal-overlay { background: rgba(0,0,0,.2) !important; backdrop-filter: blur(6px); }
 .mantine-Modal-title { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
