@@ -8,3 +8,4 @@ coverage/
 release/
 .env
 .env.local
+*.tsbuildinfo
